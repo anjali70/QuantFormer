@@ -7,6 +7,6 @@ headline = "Company reports strong quarterly earnings and higher revenue."
 
 result = model.analyze(headline)
 
-print("Headline:", headline)
-print("Sentiment:", result["sentiment"])
-print("Score:", result["score"])
+print("Headline:", result["text"])
+print("Sentiment Score:", result["sentiment_score"])
+print("Embedding Size:", len(result["embedding"]))

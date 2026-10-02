@@ -18,22 +18,27 @@ class FinBERT:
         )
 
         with torch.no_grad():
-            outputs = self.model(**inputs)
+            outputs = self.model(
+                **inputs,
+                output_hidden_states=True
+            )
 
         probabilities = torch.softmax(outputs.logits, dim=1)[0]
 
-        labels = ["positive", "negative", "neutral"]
-        result = {
-            labels[i]: float(probabilities[i])
-            for i in range(3)
-        }
+        positive = float(probabilities[0])
+        negative = float(probabilities[1])
+        neutral = float(probabilities[2])
 
-        sentiment_score = (
-            result["positive"] - result["negative"]
-        )
+        sentiment_score = positive - negative
+
+        # Get 768-dimensional FinBERT embedding
+        embedding = outputs.hidden_states[-1][:, 0, :].squeeze().tolist()
 
         return {
             "text": text,
-            "sentiment": result,
-            "score": sentiment_score
+            "positive": positive,
+            "negative": negative,
+            "neutral": neutral,
+            "sentiment_score": sentiment_score,
+            "embedding": embedding
         }
