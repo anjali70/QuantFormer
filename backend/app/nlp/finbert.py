@@ -1,27 +1,34 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+)
 
 
 class FinBERT:
     def __init__(self):
-        self.tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            "ProsusAI/finbert"
-        )
+        model_name = "ProsusAI/finbert"
 
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name
+        )
+        self.model.eval()
+
+    @torch.no_grad()
     def analyze(self, text):
         inputs = self.tokenizer(
             text,
             return_tensors="pt",
             truncation=True,
-            padding=True
+            padding=True,
+            max_length=128,
         )
 
-        with torch.no_grad():
-            outputs = self.model(
-                **inputs,
-                output_hidden_states=True
-            )
+        outputs = self.model(
+            **inputs,
+            output_hidden_states=True,
+        )
 
         probabilities = torch.softmax(outputs.logits, dim=1)[0]
 
@@ -31,8 +38,11 @@ class FinBERT:
 
         sentiment_score = positive - negative
 
-        # Get 768-dimensional FinBERT embedding
-        embedding = outputs.hidden_states[-1][:, 0, :].squeeze().tolist()
+        embedding = (
+            outputs.hidden_states[-1][:, 0, :]
+            .squeeze(0)
+            .tolist()
+        )
 
         return {
             "text": text,
@@ -40,5 +50,5 @@ class FinBERT:
             "negative": negative,
             "neutral": neutral,
             "sentiment_score": sentiment_score,
-            "embedding": embedding
+            "embedding": embedding,
         }

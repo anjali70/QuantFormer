@@ -4,15 +4,23 @@ from torch.utils.data import Dataset, DataLoader
 
 class QuantFormerDataset(Dataset):
     def __init__(self, market_data, sentiment_data, labels):
-        self.market_data = torch.tensor(
+        if not (
+            len(market_data)
+            == len(sentiment_data)
+            == len(labels)
+        ):
+            raise ValueError(
+                "Market data, sentiment data and labels "
+                "must have equal lengths."
+            )
+
+        self.market = torch.as_tensor(
             market_data, dtype=torch.float32
         )
-
-        self.sentiment_data = torch.tensor(
+        self.sentiment = torch.as_tensor(
             sentiment_data, dtype=torch.float32
         )
-
-        self.labels = torch.tensor(
+        self.labels = torch.as_tensor(
             labels, dtype=torch.float32
         )
 
@@ -21,9 +29,9 @@ class QuantFormerDataset(Dataset):
 
     def __getitem__(self, index):
         return (
-            self.market_data[index],
-            self.sentiment_data[index],
-            self.labels[index]
+            self.market[index],
+            self.sentiment[index],
+            self.labels[index],
         )
 
 
@@ -31,16 +39,17 @@ def create_dataloader(
     market_data,
     sentiment_data,
     labels,
-    batch_size=4
+    batch_size=4,
+    shuffle=True,
 ):
     dataset = QuantFormerDataset(
         market_data,
         sentiment_data,
-        labels
+        labels,
     )
 
     return DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=True
+        shuffle=shuffle,
     )

@@ -3,13 +3,20 @@ class RiskEngine:
         self.threshold = threshold
 
     def check_risk(self, crash_probability):
-        if crash_probability >= self.threshold:
+        halted = float(crash_probability) >= self.threshold
+
+        if halted:
             return {
                 "status": "HALTED",
-                "message": "Trading halted due to high crash risk."
+                "message": (
+                    "Trading halted due to high "
+                    "simulated crash risk."
+                ),
             }
 
         return {
             "status": "ACTIVE",
-            "message": "Trading active."
+            "message": (
+                "Trading active; risk is below threshold."
+            ),
         }

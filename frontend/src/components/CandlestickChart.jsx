@@ -1,96 +1,98 @@
+
 import { useEffect, useRef } from "react";
-import {
-  createChart,
-  CandlestickSeries
-} from "lightweight-charts";
+import { createChart, CandlestickSeries } from "lightweight-charts";
 
-
-export default function CandlestickChart() {
-
-  const chartContainer = useRef(null);
+export default function CandlestickChart({ marketUpdate }) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const seriesRef = useRef(null);
+  const lastCandleTimeRef = useRef(null);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    const chart = createChart(
-      chartContainer.current,
-      {
-        width: 900,
-        height: 450,
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: 400,
+      layout: {
+        background: { color: "#0b0f14" },
+        textColor: "#d1d5db",
+      },
+      grid: {
+        vertLines: { color: "#1f2937" },
+        horzLines: { color: "#1f2937" },
+      },
+      timeScale: { timeVisible: true },
+    });
 
-        layout: {
-          background: {
-            color: "#0b0f14"
-          },
-          textColor: "#d1d5db"
-        },
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderVisible: false,
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
+    });
 
-        grid: {
-          vertLines: {
-            color: "#1f2937"
-          },
-          horzLines: {
-            color: "#1f2937"
-          }
-        }
-      }
-    );
+    chartRef.current = chart;
+    seriesRef.current = series;
 
-    const series = chart.addSeries(
-      CandlestickSeries,
-      {
-        upColor: "#22c55e",
-        downColor: "#ef4444",
-        borderVisible: false,
-        wickUpColor: "#22c55e",
-        wickDownColor: "#ef4444"
-      }
-    );
+    const now = Math.floor(Date.now() / 60_000) * 60;
+    const initialData = Array.from({ length: 30 }, (_, i) => {
+      const close = 100 + Math.sin(i / 3);
+      return {
+        time: now - (30 - i) * 60,
+        open: close - 0.1,
+        high: close + 0.2,
+        low: close - 0.2,
+        close,
+      };
+    });
 
-    const data = [];
+    series.setData(initialData);
+    lastCandleTimeRef.current = initialData[initialData.length - 1].time;
 
-    let price = 100;
-
-    for (let i = 0; i < 100; i++) {
-
-      const open = price;
-
-      const close =
-        price + (Math.random() - 0.5) * 0.5;
-
-      const high =
-        Math.max(open, close) +
-        Math.random() * 0.2;
-
-      const low =
-        Math.min(open, close) -
-        Math.random() * 0.2;
-
-      data.push({
-        time: 1700000000 + i * 60,
-        open,
-        high,
-        low,
-        close
-      });
-
-      price = close;
-    }
-
-    series.setData(data);
+    const observer = new ResizeObserver(() => {
+      chart.applyOptions({ width: container.clientWidth });
+    });
+    observer.observe(container);
 
     return () => {
+      observer.disconnect();
       chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
     };
-
   }, []);
 
-  return (
-    <div
-      ref={chartContainer}
-      style={{
-        width: "100%",
-        height: "450px"
-      }}
-    />
-  );
+  useEffect(() => {
+    if (!marketUpdate || !seriesRef.current) return;
+
+    const time = Math.floor(Date.now() / 60_000) * 60;
+    const price = marketUpdate.mid_price;
+    const previousTime = lastCandleTimeRef.current;
+
+    if (time > previousTime) {
+      seriesRef.current.update({
+        time,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+      });
+      lastCandleTimeRef.current = time;
+    } else {
+      // Update the current candle with the newest market price.
+      // Lightweight Charts expects the latest candle timestamp here.
+      seriesRef.current.update({
+        time: previousTime,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+      });
+    }
+  }, [marketUpdate]);
+
+  return <div ref={containerRef} style={{ width: "100%" }} />;
 }

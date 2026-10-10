@@ -1,111 +1,281 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+:root {
+  font-family: Inter, Arial, sans-serif;
+  color: #e5e7eb;
+  background: #080c12;
+  font-synthesis: none;
 }
 
 body {
   margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #080c12;
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
+button,
+input {
+  font: inherit;
+}
+
+.dashboard {
+  width: min(1500px, 100%);
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  padding: 24px;
+}
+
+.dashboard-header {
   display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+.dashboard-header h1 {
   margin: 0;
+  font-size: 30px;
+  letter-spacing: -0.8px;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+.dashboard-header p,
+.muted {
+  color: #94a3b8;
+  font-size: 13px;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
+.dashboard-header p {
+  margin-bottom: 0;
+}
+
+.simulation-badge {
+  padding: 7px 12px;
+  border: 1px solid #475569;
+  border-radius: 20px;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.summary-grid,
+.market-grid {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.market-grid {
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+}
+
+.panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #263244;
+  border-radius: 12px;
+  background: #111722;
+}
+
+.panel h2 {
+  margin: 0 0 18px;
+  font-size: 17px;
+}
+
+.chart-panel {
+  overflow: hidden;
+}
+
+.risk-probability {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.risk-track {
+  height: 8px;
+  margin: 18px 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #263244;
+}
+
+.risk-fill {
+  height: 100%;
+  border-radius: 8px;
+}
+
+.risk-normal {
+  background: #22c55e;
+}
+
+.risk-high {
+  background: #ef4444;
+}
+
+.status-active {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.status-halted {
+  color: #f87171;
+  font-weight: 700;
+}
+
+.news-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #263244;
+}
+
+.news-item:last-child {
+  border-bottom: 0;
+}
+
+.news-item p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.news-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.sentiment {
   padding: 4px 8px;
-  background: var(--code-bg);
+  border-radius: 5px;
+  font-weight: 700;
+}
+
+.sentiment-positive {
+  color: #4ade80;
+  background: #143323;
+}
+
+.sentiment-negative {
+  color: #f87171;
+  background: #3b1c24;
+}
+
+.sentiment-neutral {
+  color: #facc15;
+  background: #352e17;
+}
+
+.dom-header,
+.dom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 9px 4px;
+}
+
+.dom-header {
+  color: #94a3b8;
+  font-size: 12px;
+  border-bottom: 1px solid #263244;
+}
+
+.dom-header span:last-child,
+.dom-row span:last-child {
+  text-align: right;
+}
+
+.dom-row {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ask {
+  color: #f87171;
+}
+
+.bid {
+  color: #4ade80;
+}
+
+.mid-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0;
+  padding: 12px 8px;
+  border-top: 1px solid #263244;
+  border-bottom: 1px solid #263244;
+  color: #cbd5e1;
+}
+
+.mid-price strong {
+  color: #f8fafc;
+  font-size: 18px;
+}
+
+.performance-panel {
+  margin-bottom: 18px;
+}
+
+.performance-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 12px;
+}
+
+.performance-stats p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.performance-panel .muted {
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.dashboard-footer {
+  padding: 18px 0 4px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 850px) {
+  .market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .dashboard {
+    padding: 12px;
+  }
+
+  .dashboard-header {
+    align-items: flex-start;
+  }
+
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
 }

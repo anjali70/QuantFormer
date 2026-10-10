@@ -2,24 +2,36 @@ import pandas as pd
 
 
 def align_market_and_news(market_data, news_data):
-    market_df = pd.DataFrame(market_data)
-    news_df = pd.DataFrame(news_data)
+    market = pd.DataFrame(market_data)
+    news = pd.DataFrame(news_data)
 
-    market_df["timestamp"] = pd.to_datetime(market_df["timestamp"])
-    news_df["timestamp"] = pd.to_datetime(news_df["timestamp"])
+    if market.empty:
+        return market
 
-    market_df = market_df.sort_values("timestamp")
-    news_df = news_df.sort_values("timestamp")
+    market["timestamp"] = pd.to_datetime(
+        market["timestamp"], utc=True
+    )
+    market = market.sort_values("timestamp")
 
-    aligned_data = pd.merge_asof(
-        market_df,
-        news_df,
+    if news.empty:
+        market["sentiment_score"] = 0.0
+        market["embedding"] = None
+        return market
+
+    news["timestamp"] = pd.to_datetime(
+        news["timestamp"], utc=True
+    )
+    news = news.sort_values("timestamp")
+
+    aligned = pd.merge_asof(
+        market,
+        news[["timestamp", "sentiment_score", "embedding"]],
         on="timestamp",
-        direction="backward"
+        direction="backward",
     )
 
-    aligned_data["sentiment_score"] = (
-        aligned_data["sentiment_score"].fillna(0)
+    aligned["sentiment_score"] = (
+        aligned["sentiment_score"].fillna(0.0)
     )
 
-    return aligned_data
+    return aligned

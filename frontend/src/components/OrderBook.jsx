@@ -1,16 +1,16 @@
-export default function OrderBook({ orderBook }) {
 
+export default function OrderBook({ orderBook }) {
   if (!orderBook) {
     return (
-      <div className="panel">
-        Waiting for order book...
-      </div>
+      <section className="panel">
+        <h2>Depth of Market</h2>
+        <p className="muted">Waiting for order book...</p>
+      </section>
     );
   }
 
   return (
-    <div className="panel">
-
+    <section className="panel">
       <h2>Depth of Market</h2>
 
       <div className="dom-header">
@@ -19,57 +19,27 @@ export default function OrderBook({ orderBook }) {
       </div>
 
       <div className="asks">
-
-        {[...orderBook.asks]
-          .reverse()
-          .map((level, index) => (
-
-            <div className="dom-row ask" key={index}>
-
-              <span>
-                {level.price.toFixed(2)}
-              </span>
-
-              <span>
-                {level.volume}
-              </span>
-
-            </div>
-
-          ))}
-
+        {[...orderBook.asks].reverse().map((level, index) => (
+          <div className="dom-row ask" key={`ask-${index}`}>
+            <span>{Number(level.price).toFixed(2)}</span>
+            <span>{level.volume}</span>
+          </div>
+        ))}
       </div>
 
       <div className="mid-price">
-
-        MID
-
-        <strong>
-          {orderBook.mid_price.toFixed(2)}
-        </strong>
-
+        <span>Mid Price</span>
+        <strong>{Number(orderBook.mid_price).toFixed(2)}</strong>
       </div>
 
       <div className="bids">
-
         {orderBook.bids.map((level, index) => (
-
-          <div className="dom-row bid" key={index}>
-
-            <span>
-              {level.price.toFixed(2)}
-            </span>
-
-            <span>
-              {level.volume}
-            </span>
-
+          <div className="dom-row bid" key={`bid-${index}`}>
+            <span>{Number(level.price).toFixed(2)}</span>
+            <span>{level.volume}</span>
           </div>
-
         ))}
-
       </div>
-
-    </div>
+    </section>
   );
 }

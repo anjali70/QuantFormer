@@ -1,39 +1,37 @@
+from pathlib import Path
+
 import torch
 
-from fusion_model import QuantFormerModel
+from app.config import MODEL_PATH
+from app.models.fusion_model import QuantFormerModel
 
 
 class CrashPredictor:
-
     def __init__(self):
-        self.model = QuantFormerModel()
-
-        self.model.load_state_dict(
-            torch.load(
-                "quantformer_model.pth",
-                map_location="cpu"
+        if not Path(MODEL_PATH).exists():
+            raise FileNotFoundError(
+                "Model file not found. Run "
+                "`python -m app.models.train` "
+                "from the backend folder first."
             )
-        )
 
+        self.model = QuantFormerModel()
+        self.model.load_state_dict(
+            torch.load(MODEL_PATH, map_location="cpu")
+        )
         self.model.eval()
 
-    def predict(self, market_data, sentiment_score):
-
+    @torch.no_grad()
+    def predict(self, market_features, sentiment_score):
         market = torch.tensor(
-            [market_data],
-            dtype=torch.float32
+            [market_features], dtype=torch.float32
         )
-
         sentiment = torch.tensor(
-            [[sentiment_score]],
-            dtype=torch.float32
+            [[sentiment_score]], dtype=torch.float32
         )
 
-        with torch.no_grad():
+        probability = self.model(
+            market, sentiment
+        ).item()
 
-            probability = self.model(
-                market,
-                sentiment
-            ).item()
-
-        return probability
+        return float(probability)

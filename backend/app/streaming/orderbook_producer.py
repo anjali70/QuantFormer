@@ -5,68 +5,67 @@ from datetime import datetime, timezone
 
 from kafka import KafkaProducer
 
-
-SYMBOL = "QTF"
-BASE_PRICE = 100.0
-
-
-producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda value: json.dumps(value).encode("utf-8")
-)
-
-
-def generate_order_book():
-    mid_price = BASE_PRICE + random.uniform(-1, 1)
-
-    bids = []
-    asks = []
-
-    for level in range(1, 11):
-
-        bid_price = round(mid_price - level * 0.01, 2)
-        ask_price = round(mid_price + level * 0.01, 2)
-
-        bid_volume = random.randint(100, 5000)
-        ask_volume = random.randint(100, 5000)
-
-        bids.append({
-            "price": bid_price,
-            "volume": bid_volume
-        })
-
-        asks.append({
-            "price": ask_price,
-            "volume": ask_volume
-        })
-
-    return {
-        "symbol": SYMBOL,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "mid_price": round(mid_price, 2),
-        "bids": bids,
-        "asks": asks
-    }
+from app.config import KAFKA_BOOTSTRAP_SERVERS, ORDERBOOK_TOPIC
 
 
 def main():
+    producer = KafkaProducer(
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+    )
 
-    print("Starting L2 Order Book producer...")
+    price = 100.50
+    print(f"Publishing market data to {ORDERBOOK_TOPIC}")
 
-    while True:
+    try:
+        while True:
+            price += random.uniform(-0.08, 0.08)
 
-        order_book = generate_order_book()
+            bids = [
+                {
+                    "price": round(price - 0.10 * (i + 1), 2),
+                    "volume": random.randint(400, 1800),
+                }
+                for i in range(5)
+            ]
 
-        producer.send(
-            "orderbook",
-            order_book
-        )
+            asks = [
+                {
+                    "price": round(price + 0.10 * (i + 1), 2),
+                    "volume": random.randint(400, 1800),
+                }
+                for i in range(5)
+            ]
 
-        producer.flush()
+            bid_volume = sum(level["volume"] for level in bids)
+            ask_volume = sum(level["volume"] for level in asks)
 
-        print(order_book)
+            event = {
+                "type": "market_update",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "mid_price": round(price, 2),
+                "bids": bids,
+                "asks": asks,
+                "bid_volume": bid_volume,
+                "ask_volume": ask_volume,
+                "imbalance": (
+                    (bid_volume - ask_volume)
+                    / (bid_volume + ask_volume)
+                ),
+                "spread": round(asks[0]["price"] - bids[0]["price"], 4),
+            }
 
-        time.sleep(0.1)
+            producer.send(ORDERBOOK_TOPIC, event)
+            producer.flush()
+
+            print("Market mid-price:", event["mid_price"])
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("Market producer stopped.")
+
+    finally:
+        producer.close()
 
 
 if __name__ == "__main__":

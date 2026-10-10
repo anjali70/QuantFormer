@@ -5,62 +5,46 @@ from datetime import datetime, timezone
 
 from kafka import KafkaProducer
 
-
-producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda value: json.dumps(value).encode("utf-8")
-)
+from app.config import KAFKA_BOOTSTRAP_SERVERS, NEWS_TOPIC
 
 
 HEADLINES = [
-
-    "Company reports stronger than expected quarterly earnings",
-
-    "Company revenue falls below analyst expectations",
-
-    "Major institutional investor increases position",
-
-    "Regulators announce investigation into company operations",
-
-    "Company announces major new strategic partnership",
-
-    "Markets react to unexpected interest rate announcement",
-
-    "Analysts downgrade company following weak guidance",
-
-    "Company announces record quarterly revenue",
-
-    "Unexpected supply disruption raises market concerns",
-
-    "Company announces significant share buyback program",
-
+    "Company reports stronger quarterly earnings and higher revenue",
+    "Market falls after central bank signals higher interest rates",
+    "Technology company announces a major new product",
+    "Company warns that future revenue may decline",
+    "Investors remain cautious ahead of inflation report",
+    "Firm reports better than expected cash flow",
 ]
 
 
 def main():
+    producer = KafkaProducer(
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+    )
 
-    print("Starting financial news producer...")
+    print(f"Publishing financial news to {NEWS_TOPIC}")
 
-    while True:
+    try:
+        while True:
+            event = {
+                "type": "news",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "headline": random.choice(HEADLINES),
+            }
 
-        headline = random.choice(HEADLINES)
+            producer.send(NEWS_TOPIC, event)
+            producer.flush()
 
-        message = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "source": "MockReuters",
-            "headline": headline
-        }
+            print("News headline:", event["headline"])
+            time.sleep(3)
 
-        producer.send(
-            "news",
-            message
-        )
+    except KeyboardInterrupt:
+        print("News producer stopped.")
 
-        producer.flush()
-
-        print(message)
-
-        time.sleep(random.uniform(2, 5))
+    finally:
+        producer.close()
 
 
 if __name__ == "__main__":
