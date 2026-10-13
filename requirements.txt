@@ -9,3 +9,5 @@ transformers
 scikit-learn
 websockets
 python-dotenv
+lightning
+python_forecasting
