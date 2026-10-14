@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaConsumer
+from app.features.collect_history import save_market_event
 
 from app.config import (
     KAFKA_BOOTSTRAP_SERVERS,
@@ -115,6 +116,10 @@ def process_market(event):
     global latest_market
 
     sentiment_score = latest_news.get("sentiment_score", 0.0)
+    try:
+        save_market_event(event, sentiment_score)
+    except Exception:
+        logger.exception("Could not save market history")   
     prediction_source = "demo_fallback"
 
     try:
