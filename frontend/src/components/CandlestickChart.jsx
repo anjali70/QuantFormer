@@ -1,12 +1,18 @@
 
-import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries } from "lightweight-charts";
+import { useEffect, useRef, useState } from "react";
+import {
+  createChart,
+  CandlestickSeries,
+  LineSeries,
+} from "lightweight-charts";
 
 export default function CandlestickChart({ marketUpdate }) {
   const containerRef = useRef(null);
-  const chartRef = useRef(null);
   const seriesRef = useRef(null);
-  const lastCandleTimeRef = useRef(null);
+  const lastCandleRef = useRef(null);
+  const forecastSeriesRef = useRef({});
+
+  const [forecastStatus, setForecastStatus] = useState("Waiting for forecast");
 
   useEffect(() => {
     const container = containerRef.current;
@@ -14,7 +20,7 @@ export default function CandlestickChart({ marketUpdate }) {
 
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: 400,
+      height: 380,
       layout: {
         background: { color: "#0b0f14" },
         textColor: "#d1d5db",
@@ -23,10 +29,13 @@ export default function CandlestickChart({ marketUpdate }) {
         vertLines: { color: "#1f2937" },
         horzLines: { color: "#1f2937" },
       },
-      timeScale: { timeVisible: true },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: true,
+      },
     });
 
-    const series = chart.addSeries(CandlestickSeries, {
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
       downColor: "#ef4444",
       borderVisible: false,
@@ -34,12 +43,35 @@ export default function CandlestickChart({ marketUpdate }) {
       wickDownColor: "#ef4444",
     });
 
-    chartRef.current = chart;
-    seriesRef.current = series;
+    const median = chart.addSeries(LineSeries, {
+      color: "#60a5fa",
+      lineWidth: 3,
+      title: "TFT median",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
 
-    const now = Math.floor(Date.now() / 60_000) * 60;
+    const lower = chart.addSeries(LineSeries, {
+      color: "#f59e0b",
+      lineWidth: 1,
+      title: "Lower quantile",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+
+    const upper = chart.addSeries(LineSeries, {
+      color: "#c084fc",
+      lineWidth: 1,
+      title: "Upper quantile",
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+
+    const now = Math.floor(Date.now() / 60000) * 60;
+
     const initialData = Array.from({ length: 30 }, (_, i) => {
       const close = 100 + Math.sin(i / 3);
+
       return {
         time: now - (30 - i) * 60,
         open: close - 0.1,
@@ -49,50 +81,144 @@ export default function CandlestickChart({ marketUpdate }) {
       };
     });
 
-    series.setData(initialData);
-    lastCandleTimeRef.current = initialData[initialData.length - 1].time;
+    candles.setData(initialData);
+    lastCandleRef.current = initialData[initialData.length - 1];
+    seriesRef.current = candles;
 
-    const observer = new ResizeObserver(() => {
+    forecastSeriesRef.current = { median, lower, upper };
+
+    const resizeObserver = new ResizeObserver(() => {
       chart.applyOptions({ width: container.clientWidth });
     });
-    observer.observe(container);
+
+    resizeObserver.observe(container);
 
     return () => {
-      observer.disconnect();
+      resizeObserver.disconnect();
       chart.remove();
-      chartRef.current = null;
       seriesRef.current = null;
+      lastCandleRef.current = null;
+      forecastSeriesRef.current = {};
     };
   }, []);
 
+  // Update the live candle using market events from Kafka.
   useEffect(() => {
     if (!marketUpdate || !seriesRef.current) return;
 
-    const time = Math.floor(Date.now() / 60_000) * 60;
-    const price = marketUpdate.mid_price;
-    const previousTime = lastCandleTimeRef.current;
+    const price = Number(marketUpdate.mid_price);
+    if (!Number.isFinite(price)) return;
 
-    if (time > previousTime) {
-      seriesRef.current.update({
+    const time = Math.floor(Date.now() / 60000) * 60;
+    const previous = lastCandleRef.current;
+    if (!previous) return;
+
+    let candle;
+
+    if (time > previous.time) {
+      candle = {
         time,
-        open: price,
-        high: price,
-        low: price,
+        open: previous.close,
+        high: Math.max(previous.close, price),
+        low: Math.min(previous.close, price),
         close: price,
-      });
-      lastCandleTimeRef.current = time;
+      };
     } else {
-      // Update the current candle with the newest market price.
-      // Lightweight Charts expects the latest candle timestamp here.
-      seriesRef.current.update({
-        time: previousTime,
-        open: price,
-        high: price,
-        low: price,
+      candle = {
+        time: previous.time,
+        open: previous.open,
+        high: Math.max(previous.high, price),
+        low: Math.min(previous.low, price),
         close: price,
-      });
+      };
     }
+
+    seriesRef.current.update(candle);
+    lastCandleRef.current = candle;
   }, [marketUpdate]);
 
-  return <div ref={containerRef} style={{ width: "100%" }} />;
+  // Fetch the latest TFT forecast every five seconds.
+  useEffect(() => {
+    let stopped = false;
+
+    async function loadForecast() {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/forecast");
+
+        if (!response.ok) {
+          throw new Error(`Forecast API returned ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (stopped) return;
+
+        const forecasts = result.forecasts ?? [];
+
+        const toPoints = (key) =>
+          forecasts
+            .map((item) => ({
+              time: Math.floor(
+                new Date(item.timestamp).getTime() / 1000
+              ),
+              value: Number(item[key]),
+            }))
+            .filter(
+              (item) =>
+                Number.isFinite(item.time) &&
+                Number.isFinite(item.value)
+            )
+            .sort((a, b) => a.time - b.time)
+            .filter(
+              (item, index, all) =>
+                index === 0 || item.time > all[index - 1].time
+            );
+
+        const { median, lower, upper } = forecastSeriesRef.current;
+
+        if (median && lower && upper) {
+          median.setData(toPoints("median"));
+          lower.setData(toPoints("lower"));
+          upper.setData(toPoints("upper"));
+          setForecastStatus(`Forecast updated: ${forecasts.length} steps`);
+        }
+      } catch (error) {
+        if (!stopped) {
+          setForecastStatus("Forecast unavailable — check backend/model");
+          console.error("Could not load TFT forecast:", error);
+        }
+      }
+    }
+
+    loadForecast();
+    const timer = setInterval(loadForecast, 5000);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "14px",
+          marginBottom: "10px",
+          fontSize: "12px",
+        }}
+      >
+        <span style={{ color: "#60a5fa" }}>━ TFT median (50%)</span>
+        <span style={{ color: "#f59e0b" }}>━ Lower bound (10%)</span>
+        <span style={{ color: "#c084fc" }}>━ Upper bound (90%)</span>
+      </div>
+
+      <div ref={containerRef} style={{ width: "100%" }} />
+
+      <p style={{ color: "#94a3b8", fontSize: "12px" }}>
+        {forecastStatus}
+      </p>
+    </div>
+  );
 }

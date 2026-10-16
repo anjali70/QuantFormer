@@ -3,6 +3,7 @@ import json
 import logging
 import threading
 
+from fastapi import HTTPException
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,7 @@ from app.config import (
 from app.websocket_manager import manager
 from app.risk.risk_engine import RiskEngine
 
+tft_predictor = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quantformer")
@@ -251,3 +253,25 @@ async def market_websocket(websocket: WebSocket):
 
     except Exception:
         manager.disconnect(websocket)
+
+
+@app.get("/forecast")
+def get_tft_forecast():
+    global tft_predictor
+
+    try:
+        if tft_predictor is None:
+            from app.models.tft_predict import TFTPredictor
+            tft_predictor = TFTPredictor()
+
+        return tft_predictor.predict()
+
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        logger.exception("TFT forecast failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"TFT forecast failed: {exc}",
+        )
