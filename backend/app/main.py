@@ -10,6 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaConsumer
 from app.features.collect_history import save_market_event
 
+from app.models.tft_risk import (
+    get_latest_market_price,
+    calculate_forecast_risk,
+)
 from app.config import (
     KAFKA_BOOTSTRAP_SERVERS,
     ORDERBOOK_TOPIC,
@@ -275,3 +279,32 @@ def get_tft_forecast():
             status_code=500,
             detail=f"TFT forecast failed: {exc}",
         )
+
+
+@app.get("/forecast-risk")
+def get_forecast_risk():
+    global tft_predictor
+
+    try:
+        if tft_predictor is None:
+            from app.models.tft_predict import TFTPredictor
+            tft_predictor = TFTPredictor()
+
+        forecast_result = tft_predictor.predict()
+        current_price = get_latest_market_price()
+
+        return calculate_forecast_risk(
+            current_price=current_price,
+            forecast_result=forecast_result,
+        )
+
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    except Exception as exc:
+        logger.exception("Forecast risk calculation failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Forecast risk calculation failed: {exc}",
+        )
+
