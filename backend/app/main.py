@@ -9,6 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaConsumer
 from app.features.collect_history import save_market_event
+from app.models.tft_interpret import generate_interpretation
 
 from app.models.tft_risk import (
     get_latest_market_price,
