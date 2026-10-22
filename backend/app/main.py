@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaConsumer
 from app.features.collect_history import save_market_event
 from app.models.tft_interpret import generate_interpretation
+from app.features.news_history import save_news_event
 
 from app.models.tft_risk import (
     get_latest_market_price,
@@ -214,6 +215,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.get("/news-history")
+def get_news_history(limit: int = 10):
+    from app.features.news_history import load_recent_news
+
+    try:
+        return {
+            "count": min(max(limit, 1), 100),
+            "news": load_recent_news(limit),
+        }
+    except Exception as exc:
+        logger.exception("Could not load news history")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not load news history: {exc}",
+        )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -309,3 +327,7 @@ def get_forecast_risk():
             detail=f"Forecast risk calculation failed: {exc}",
         )
 
+    try:
+        save_news_event(news_event, sentiment_score)
+    except Exception:
+        logger.exception("Could not save news history")
