@@ -6,6 +6,8 @@ import OrderBook from "./components/OrderBook";
 import NewsPanel from "./components/NewsPanel";
 import RiskPanel from "./components/RiskPanel";
 import "./index.css";
+import InterpretabilitySidebar from "./components/InterpretabilitySidebar";
+import RecentNews from "./components/RecentNews";
 
 export default function App() {
   const [orderBook, setOrderBook] = useState(null);
