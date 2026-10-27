@@ -113,9 +113,7 @@ def load_recent_news(limit=10):
             "headline": str(row["headline"]),
             "source": str(row["source"]),
             "sentiment_label": str(row["sentiment_label"]),
-            "sentiment_score": float(
-                row["sentiment_score"]
-            ),
+            "sentiment_score": float(row["sentiment_score"]),
         })
 
     return results

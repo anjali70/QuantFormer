@@ -1,0 +1,126 @@
+
+.interpret-card {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #273449;
+  border-radius: 14px;
+  padding: 22px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.interpret-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #273449;
+  padding-bottom: 16px;
+}
+
+.interpret-header h2 {
+  font-size: 20px;
+  margin: 4px 0 8px;
+}
+
+.interpret-eyebrow {
+  color: #60a5fa;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.interpret-subtitle,
+.interpret-help {
+  color: #9ca3af;
+  font-size: 12px;
+  margin: 5px 0;
+}
+
+.interpret-status {
+  border: 1px solid #166534;
+  color: #4ade80;
+  border-radius: 20px;
+  padding: 6px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.interpret-status.status-error {
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+.interpret-section {
+  margin-top: 20px;
+}
+
+.interpret-section h4 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.attention-item,
+.importance-item {
+  margin: 14px 0;
+}
+
+.importance-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+
+.importance-label span {
+  overflow-wrap: anywhere;
+}
+
+.importance-label strong {
+  color: #93c5fd;
+  font-variant-numeric: tabular-nums;
+}
+
+.importance-track {
+  height: 7px;
+  background: #273449;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.importance-fill {
+  height: 100%;
+  background: #60a5fa;
+  border-radius: 10px;
+}
+
+.attention-fill {
+  height: 100%;
+  background: #a78bfa;
+  border-radius: 10px;
+}
+
+.interpret-note {
+  background: #0b1220;
+  border: 1px solid #273449;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 22px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.interpret-note p {
+  color: #aebbd0;
+  margin-bottom: 0;
+}
+
+.interpret-error {
+  color: #fca5a5;
+  overflow-wrap: anywhere;
+}

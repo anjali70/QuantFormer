@@ -1,4 +1,4 @@
-
+# train and saves the model
 from pathlib import Path
 import pickle
 

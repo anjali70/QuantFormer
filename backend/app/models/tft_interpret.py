@@ -6,257 +6,199 @@ import pandas as pd
 import torch
 from pytorch_forecasting import TemporalFusionTransformer
 
-from app.models.tft_setup import (
-    DATA_DIR,
-    load_data,
-    build_datasets,
-)
+from app.models.tft_setup import load_data, build_datasets
 
-MODEL_FILE = DATA_DIR / "tft_model.ckpt"
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+CHECKPOINT = DATA_DIR / "tft_model.ckpt"
 
 
 def to_numpy(value):
-    """Convert tensors and arrays to NumPy arrays."""
+    """Convert a tensor or array-like value into a NumPy array."""
+    if value is None:
+        return np.array([])
+
     if isinstance(value, torch.Tensor):
         return value.detach().cpu().numpy()
 
-    return np.asarray(value)
+    try:
+        return np.asarray(value)
+    except Exception:
+        return np.array([])
 
 
-def get_result_parts(result):
-    """Extract prediction output and input data from predict()."""
+def get_prediction_parts(result):
+    """Handle common PyTorch Forecasting prediction return formats."""
     if isinstance(result, (tuple, list)):
-        if len(result) < 2:
-            raise RuntimeError(
-                "model.predict() did not return both predictions and inputs."
-            )
+        raw = result[0] if len(result) > 0 else None
+        inputs = result[1] if len(result) > 1 else {}
+    elif hasattr(result, "output"):
+        raw = result.output
+        inputs = getattr(result, "x", {})
+    else:
+        raw = result
+        inputs = {}
 
-        return result[0], result[1]
+    if not isinstance(inputs, dict):
+        inputs = {}
 
-    raise RuntimeError(
-        "Unexpected model.predict() result type: "
-        f"{type(result).__name__}. "
-        "Expected a tuple or list with predictions and inputs."
-    )
+    return raw, inputs
 
 
-def summarize_importance(values, names, top_n=6):
-    """Summarize variable-selection importance."""
-    if values is None:
-        return []
-
+def summarize_importance(values, names, top_n=8):
+    """Convert variable importance into a sorted list."""
     array = to_numpy(values)
 
     if array.size == 0:
         return []
 
-    # Average batch and time dimensions, keeping the feature dimension.
+    array = np.nan_to_num(array.astype(float), nan=0.0)
+    array = np.abs(array)
+
+    # Average all dimensions except the final feature dimension.
     if array.ndim > 1:
-        array = array.mean(
-            axis=tuple(range(array.ndim - 1))
-        )
+        array = array.mean(axis=tuple(range(array.ndim - 1)))
 
     array = array.reshape(-1)
-    count = min(len(array), len(names))
-    results = []
+    names = list(names or [])
 
-    for index in range(count):
-        score = float(array[index])
+    result = []
+    for index, score in enumerate(array):
+        name = (
+            str(names[index])
+            if index < len(names)
+            else f"feature_{index}"
+        )
+        result.append({
+            "feature": name,
+            "importance": round(float(score), 6),
+        })
 
-        if np.isfinite(score):
-            results.append({
-                "feature": str(names[index]),
-                "importance": round(score, 6),
-            })
-
-    results.sort(
+    return sorted(
+        result,
         key=lambda item: item["importance"],
         reverse=True,
-    )
-
-    return results[:top_n]
+    )[:top_n]
 
 
-def extract_attention_steps(
-    interpretation,
-    inputs,
-    df,
-):
-    """
-    Extract attention scores and timestamps.
+def extract_attention(attention, encoder_length=30):
+    """Return normalized attention weights for recent encoder steps."""
+    values = to_numpy(attention)
 
-    Timestamp matching is attempted only when the returned
-    encoder indices have a compatible length.
-    """
-    attention_steps = []
-    attention_value = interpretation.get("attention")
+    if values.size == 0:
+        return []
 
-    if attention_value is None:
-        return attention_steps
+    values = np.nan_to_num(values.astype(float), nan=0.0)
 
-    attention = to_numpy(attention_value)
+    # Average batch/head dimensions while preserving the final time axis.
+    if values.ndim > 1:
+        values = values.mean(axis=tuple(range(values.ndim - 1)))
 
-    # Interpret attention along the last dimension as the sequence.
-    if attention.ndim > 1:
-        attention = attention.mean(
-            axis=tuple(range(attention.ndim - 1))
-        )
+    values = values.reshape(-1)
 
-    attention = attention.reshape(-1)
+    # Attention values are useful only if their shape is meaningful.
+    values = np.maximum(values, 0)
+    total = values.sum()
 
-    if attention.size == 0:
-        return attention_steps
+    if total > 0:
+        values = values / total
 
-    encoder_indices = inputs.get("encoder_time_idx")
+    steps = []
+    for index, weight in enumerate(values):
+        steps.append({
+            "step": index + 1,
+            "relative_position": index - len(values) + 1,
+            "attention": round(float(weight), 6),
+        })
 
-    # Some library versions omit encoder_time_idx.
-    if encoder_indices is not None:
-        encoder_indices = to_numpy(
-            encoder_indices
-        ).reshape(-1)
-
-        usable = min(
-            len(attention),
-            len(encoder_indices),
-        )
-
-        if usable > 0:
-            timestamp_lookup = (
-                df.drop_duplicates("time_idx")
-                .set_index("time_idx")["timestamp"]
-                .to_dict()
-            )
-
-            selected_attention = attention[-usable:]
-            selected_indices = encoder_indices[-usable:]
-
-            for time_idx, weight in zip(
-                selected_indices,
-                selected_attention,
-            ):
-                timestamp = timestamp_lookup.get(
-                    int(time_idx)
-                )
-
-                attention_steps.append({
-                    "time_idx": int(time_idx),
-                    "timestamp": (
-                        timestamp.isoformat()
-                        if timestamp is not None
-                        else None
-                    ),
-                    "weight": round(float(weight), 6),
-                })
-
-    else:
-        # Fallback: provide recent timestamps, clearly marked
-        # as approximate rather than verified attention alignment.
-        recent = df.tail(len(attention)).reset_index(drop=True)
-        usable = min(len(attention), len(recent))
-
-        for index in range(usable):
-            attention_steps.append({
-                "time_idx": None,
-                "timestamp": recent.iloc[index][
-                    "timestamp"
-                ].isoformat(),
-                "weight": round(
-                    float(attention[-usable + index]),
-                    6,
-                ),
-                "timestamp_alignment": "approximate",
-            })
-
-    attention_steps = [
-        item for item in attention_steps
-        if np.isfinite(item["weight"])
-    ]
-
-    attention_steps.sort(
-        key=lambda item: item["weight"],
+    return sorted(
+        steps,
+        key=lambda item: item["attention"],
         reverse=True,
-    )
-
-    return attention_steps[:5]
+    )[:min(10, len(steps))]
 
 
 def generate_interpretation():
-    """Generate TFT attention and variable-importance results."""
-    if not MODEL_FILE.exists():
+    """Load the trained model and summarize its interpretation."""
+    if not CHECKPOINT.exists():
         raise FileNotFoundError(
-            f"Trained model not found: {MODEL_FILE}. "
-            "Run python -m app.models.tft_train first."
+            f"TFT checkpoint not found: {CHECKPOINT}"
         )
 
     df = load_data()
-    training, validation = build_datasets(df)
 
-    loader = validation.to_dataloader(
-        train=False,
-        batch_size=1,
-        num_workers=0,
-    )
+    # IMPORTANT: this expects build_datasets(df) to return:
+    # train_dataset, validation_dataset, train_loader, validation_loader.
+    datasets = build_datasets(df)
 
-    if len(loader) == 0:
-        raise ValueError(
-            "The validation dataset has no batches. "
-            "Check the dataset size and validation split."
+    if not isinstance(datasets, (tuple, list)) or len(datasets) < 4:
+        raise RuntimeError(
+            "Expected build_datasets(df) to return four items: "
+            "train_dataset, validation_dataset, train_loader, "
+            "validation_loader. Check tft_setup.py."
         )
 
+    validation_loader = datasets[3]
+
     model = TemporalFusionTransformer.load_from_checkpoint(
-        str(MODEL_FILE),
+        str(CHECKPOINT),
         map_location="cpu",
     )
     model.eval()
 
     with torch.no_grad():
-        result = model.predict(
-            loader,
+        prediction_result = model.predict(
+            validation_loader,
             mode="raw",
             return_x=True,
         )
 
-    raw_output, inputs = get_result_parts(result)
+    raw_output, inputs = get_prediction_parts(prediction_result)
 
-    with torch.no_grad():
-        interpretation = model.interpret_output(
-            raw_output,
-            reduction="sum",
+    if raw_output is None:
+        raise RuntimeError(
+            "TFT prediction did not return raw output."
         )
 
-    encoder_importance = summarize_importance(
+    interpretation = model.interpret_output(
+        raw_output,
+        reduction="sum",
+    )
+
+    if not isinstance(interpretation, dict):
+        raise RuntimeError(
+            "Unexpected interpretation output. "
+            "Check your PyTorch Forecasting version."
+        )
+
+    attention_steps = extract_attention(
+        interpretation.get("attention")
+    )
+
+    encoder_variables = summarize_importance(
         interpretation.get("encoder_variables"),
-        list(model.encoder_variables),
+        getattr(model, "encoder_variables", []),
     )
-
-    decoder_importance = summarize_importance(
+    decoder_variables = summarize_importance(
         interpretation.get("decoder_variables"),
-        list(model.decoder_variables),
+        getattr(model, "decoder_variables", []),
     )
-
-    static_importance = summarize_importance(
+    static_variables = summarize_importance(
         interpretation.get("static_variables"),
-        list(model.static_variables),
-    )
-
-    attention_steps = extract_attention_steps(
-        interpretation,
-        inputs,
-        df,
+        getattr(model, "static_variables", []),
     )
 
     return {
         "model": "Temporal Fusion Transformer",
         "attention_top_steps": attention_steps,
-        "encoder_variable_importance": encoder_importance,
-        "decoder_variable_importance": decoder_importance,
-        "static_variable_importance": static_importance,
+        "encoder_variable_importance": encoder_variables,
+        "decoder_variable_importance": decoder_variables,
+        "static_variable_importance": static_variables,
         "note": (
-            "Attention weights and variable-selection importance "
-            "describe model patterns, not causal effects. Timestamp "
-            "alignment may be approximate when encoder indices are "
-            "unavailable. Sentiment is a numeric feature; individual "
-            "news headlines are not identified by this model."
+            "Attention and feature importance describe model patterns, "
+            "not proof of causation. Attention positions are relative "
+            "historical steps unless explicitly aligned to real timestamps. "
+            "This model uses numeric sentiment and does not identify "
+            "individual news headlines as causes."
         ),
     }
 
@@ -264,10 +206,4 @@ def generate_interpretation():
 if __name__ == "__main__":
     import json
 
-    try:
-        result = generate_interpretation()
-        print(json.dumps(result, indent=2, default=str))
-
-    except Exception as exc:
-        print(f"Interpretability failed: {exc}")
-        raise
+    print(json.dumps(generate_interpretation(), indent=2))

@@ -182,3 +182,31 @@
     border-right-color: var(--border);
   }
 }
+
+
+.interpretability-sidebar,
+.recent-news {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.interpretability-sidebar h3,
+.recent-news h3 {
+  margin-top: 0;
+}
+
+.interpretability-sidebar li,
+.news-item {
+  margin-bottom: 12px;
+}
+
+.interpretability-sidebar small,
+.news-item small {
+  color: #9ca3af;
+}

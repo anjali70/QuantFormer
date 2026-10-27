@@ -1,4 +1,4 @@
-
+# defines the tft model and dataset
 from pathlib import Path
 
 import pandas as pd
@@ -81,7 +81,9 @@ def build_datasets(df):
 
     # Include the earlier history so the validation forecast
     # can use past observations, then forecast the next five rows.
-    validation_df = df.iloc[:split_idx + MAX_PREDICTION_LENGTH].copy()
+    validation_df = df.iloc[
+        split_idx - MAX_PREDICTION_LENGTH:
+    ].copy()
 
     training = TimeSeriesDataSet(
         train_df,
@@ -109,10 +111,21 @@ def build_datasets(df):
         predict=True,
         stop_randomization=True,
     )
+    
+    train_loader = training.to_dataloader(
+        train=True,
+        batch_size=32,
+        num_workers=0,
+    )
 
-    return training, validation
+    validation_loader = validation.to_dataloader(
+        train=False,
+        batch_size=32,
+        num_workers=0,
+    )
 
-
+    return training, validation, train_loader, validation_loader
+    # return training, validation
 def build_model(training):
     model = TemporalFusionTransformer.from_dataset(
         training,
@@ -132,18 +145,9 @@ def build_model(training):
 
 def main():
     df = load_data()
-    training, validation = build_datasets(df)
-
-    train_loader = training.to_dataloader(
-        train=True,
-        batch_size=32,
-        num_workers=0,
-    )
-
-    validation_loader = validation.to_dataloader(
-        train=False,
-        batch_size=32,
-        num_workers=0,
+    
+    training, validation, train_loader, validation_loader = (
+        build_datasets(df)
     )
 
     model = build_model(training)

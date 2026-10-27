@@ -6,8 +6,8 @@ import OrderBook from "./components/OrderBook";
 import NewsPanel from "./components/NewsPanel";
 import RiskPanel from "./components/RiskPanel";
 import "./index.css";
-import InterpretabilitySidebar from "./components/InterpretabilitySidebar";
 import RecentNews from "./components/RecentNews";
+import InterpretabilitySidebar from "./components/InterpretabilitySidebar";
 
 export default function App() {
   const [orderBook, setOrderBook] = useState(null);
@@ -67,6 +67,9 @@ export default function App() {
         <RiskPanel />
       </div>
 
+      <InterpretabilitySidebar />
+      <RecentNews />
+      
       <div className="market-grid">
         <section className="panel chart-panel">
           <h2>Market Candlestick Chart</h2>
