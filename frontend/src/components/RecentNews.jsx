@@ -39,6 +39,7 @@ export default function RecentNews() {
     }
 
     loadNews();
+
     const timer = setInterval(loadNews, 15000);
 
     return () => {
@@ -47,95 +48,116 @@ export default function RecentNews() {
     };
   }, []);
 
-  const panelStyle = {
-    background: "#111827",
-    color: "#e5e7eb",
-    border: "1px solid #273449",
-    borderRadius: 12,
-    padding: 16,
-  };
-
   return (
-    <section style={panelStyle}>
-      <h2 style={{ fontSize: 18, marginTop: 0 }}>
-        Recent News & Sentiment
-      </h2>
+    <section className="surface-card recent-news-card">
 
-      <p style={{ color: "#9ca3af", fontSize: 12 }}>
-        News events associated with recorded sentiment scores
-      </p>
+      <div className="card-heading">
+        <div>
+          <h3>Market Intelligence Feed</h3>
+          <p>Latest news events processed by the AI pipeline</p>
+        </div>
 
-      {loading && <p>Loading news...</p>}
+        <span className="live-indicator">
+          <span className="status-dot online" />
+          AUTO REFRESH
+        </span>
+      </div>
+
+      {loading && (
+        <div className="news-empty">
+          <span className="news-loading-dot" />
+          Loading market intelligence...
+        </div>
+      )}
 
       {error && (
-        <p style={{ color: "#fca5a5", fontSize: 13 }}>
-          {error}
-        </p>
+        <div className="news-empty news-error">
+          <strong>Unable to load news</strong>
+          <p>{error}</p>
+        </div>
       )}
 
       {!loading && !error && news.length === 0 && (
-        <p style={{ color: "#9ca3af", fontSize: 13 }}>
-          No news events recorded yet. Start the news producer
-          and connect it to the news history logger.
-        </p>
+        <div className="news-empty">
+          <span className="news-empty-icon">◈</span>
+          <strong>No news events yet</strong>
+          <p>
+            Start the news producer and connect it to the
+            news history logger.
+          </p>
+        </div>
       )}
 
-      {news.map((item, index) => {
-        const label = String(
-          item.sentiment_label || "Neutral"
-        );
+      {!error && news.length > 0 && (
+        <div className="news-list">
 
-        const sentimentColor =
-          label.toLowerCase() === "negative"
-            ? "#f87171"
-            : label.toLowerCase() === "positive"
-              ? "#4ade80"
-              : "#fbbf24";
+          {news.map((item, index) => {
+            const label = String(
+              item.sentiment_label || "Neutral"
+            );
 
-        return (
-          <article
-            key={`${item.timestamp}-${index}`}
-            style={{
-              padding: "12px 0",
-              borderTop: "1px solid #273449",
-            }}
-          >
-            <div
-              style={{
-                color: "#9ca3af",
-                fontSize: 11,
-              }}
-            >
-              {item.timestamp
-                ? new Date(item.timestamp).toLocaleString()
-                : "Timestamp unavailable"}
-              {" · "}
-              {item.source || "Unknown source"}
-            </div>
+            const tone =
+              label.toLowerCase() === "negative"
+                ? "negative"
+                : label.toLowerCase() === "positive"
+                  ? "positive"
+                  : "neutral";
 
-            <p
-              style={{
-                fontSize: 13,
-                lineHeight: 1.5,
-                overflowWrap: "anywhere",
-              }}
-            >
-              {item.headline}
-            </p>
+            const rawScore = Number(item.sentiment_score);
+            const score = Number.isFinite(rawScore)
+              ? rawScore.toFixed(3)
+              : "—";
 
-            <div
-              style={{
-                color: sentimentColor,
-                fontSize: 12,
-                fontWeight: 600,
-              }}
-            >
-              {label} sentiment · Score:{" "}
-              {Number(item.sentiment_score).toFixed(3)}
-            </div>
-          </article>
-        );
-      })}
+            return (
+              <article
+                className="news-item"
+                key={`${item.timestamp}-${index}`}
+              >
+
+                <div className="news-timeline">
+                  <span className={`news-dot ${tone}`} />
+                  {index !== news.length - 1 && (
+                    <span className="news-line" />
+                  )}
+                </div>
+
+                <div className="news-content">
+
+                  <div className="news-meta">
+                    <span>
+                      {item.timestamp
+                        ? new Date(item.timestamp).toLocaleString()
+                        : "Timestamp unavailable"}
+                    </span>
+
+                    <span className="news-source">
+                      {item.source || "Unknown source"}
+                    </span>
+                  </div>
+
+                  <h4>
+                    {item.headline || "Untitled news event"}
+                  </h4>
+
+                  <div className="news-bottom">
+                    <span className={`news-sentiment ${tone}`}>
+                      {label.toUpperCase()}
+                    </span>
+
+                    <span className="news-score">
+                      SCORE: {score}
+                    </span>
+                  </div>
+
+                </div>
+
+              </article>
+            );
+          })}
+
+        </div>
+      )}
+
     </section>
   );
 }

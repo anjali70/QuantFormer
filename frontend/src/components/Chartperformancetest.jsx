@@ -84,24 +84,47 @@ export default function ChartPerformanceTest() {
     };
   }, []);
 
-  return (
-    <div>
-      <h2>Chart Performance Test</h2>
-      <div className="performance-stats">
-        <p>Updates per second: <strong>{updatesPerSecond}</strong></p>
-        <p>Total updates: <strong>{totalUpdates}</strong></p>
-        <p>
-          Status:{" "}
-          <strong>
-            {updatesPerSecond >= 10 ? "Target reached" : "Testing"}
-          </strong>
-        </p>
+  
+return (
+  <div className="performance-dashboard">
+
+    <div className="performance-heading">
+      <div>
+        <h2>Chart Engine Performance</h2>
+        <p>Real-time rendering benchmark</p>
       </div>
-      <div ref={containerRef} style={{ width: "100%" }} />
-      <p className="muted">
-        This counts chart update calls. It does not by itself prove that the
-        browser thread is never blocked.
-      </p>
+
+      <span className="subtle-tag">BENCHMARK</span>
     </div>
-  );
+
+    <div className="performance-stats">
+
+      <div className="performance-stat">
+        <span>UPDATES / SEC</span>
+        <strong>{updatesPerSecond}</strong>
+      </div>
+
+      <div className="performance-stat">
+        <span>TOTAL UPDATES</span>
+        <strong>{totalUpdates.toLocaleString()}</strong>
+      </div>
+
+      <div className="performance-stat">
+        <span>BENCHMARK STATUS</span>
+        <strong className={updatesPerSecond >= 10 ? "performance-good" : ""}>
+          {updatesPerSecond >= 10 ? "TARGET REACHED" : "TESTING"}
+        </strong>
+      </div>
+
+    </div>
+
+    <div ref={containerRef} style={{ width: "100%" }} />
+
+    <p className="performance-note">
+      Measures chart update calls, not complete browser rendering
+      performance or frame rate.
+    </p>
+
+  </div>
+);
 }

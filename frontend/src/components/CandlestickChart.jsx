@@ -14,7 +14,10 @@ export default function CandlestickChart({ marketUpdate }) {
   const candleRef = useRef(null);
   const lastCandleRef = useRef(null);
   const forecastRef = useRef({});
+  const fittedRef = useRef(false);
+
   const [status, setStatus] = useState("Loading forecast...");
+  const [lastPrice, setLastPrice] = useState(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -22,55 +25,102 @@ export default function CandlestickChart({ marketUpdate }) {
 
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: 380,
+      height: 390,
+
       layout: {
-        background: { color: "#0b0f14" },
-        textColor: "#d1d5db",
+        background: { color: "#111c2d" },
+        textColor: "#91a3bd",
+        fontFamily: "Inter, sans-serif",
+        fontSize: 11,
       },
+
       grid: {
-        vertLines: { color: "#1f2937" },
-        horzLines: { color: "#1f2937" },
+        vertLines: { color: "#26364d55" },
+        horzLines: { color: "#26364d77" },
       },
+
+      crosshair: {
+        vertLine: {
+          color: "#5794ff88",
+          width: 1,
+          style: 2,
+          labelBackgroundColor: "#347dff",
+        },
+        horzLine: {
+          color: "#5794ff88",
+          width: 1,
+          style: 2,
+          labelBackgroundColor: "#347dff",
+        },
+      },
+
+      rightPriceScale: {
+        borderColor: "#30425c",
+        scaleMargins: {
+          top: 0.12,
+          bottom: 0.12,
+        },
+      },
+
       timeScale: {
+        borderColor: "#30425c",
         timeVisible: true,
-        secondsVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
       },
+
+      localization: {
+        priceFormatter: (price) => price.toFixed(2),
+      },
+
+      handleScroll: true,
+      handleScale: true,
     });
 
     const candles = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
+      upColor: "#20c997",
+      downColor: "#ff647c",
+      borderUpColor: "#20c997",
+      borderDownColor: "#ff647c",
+      wickUpColor: "#20c997",
+      wickDownColor: "#ff647c",
       borderVisible: false,
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
+      priceLineVisible: true,
+      lastValueVisible: true,
     });
 
     const median = chart.addSeries(LineSeries, {
-      color: "#60a5fa",
+      color: "#5794ff",
       lineWidth: 3,
-      title: "TFT median (50%)",
+      title: "Median 50%",
+      lineStyle: 0,
       priceLineVisible: false,
+      lastValueVisible: false,
     });
 
     const lower = chart.addSeries(LineSeries, {
-      color: "#f59e0b",
+      color: "#f6ad55",
       lineWidth: 2,
-      title: "Lower quantile (10%)",
+      title: "Lower 10%",
+      lineStyle: 2,
       priceLineVisible: false,
+      lastValueVisible: false,
     });
 
     const upper = chart.addSeries(LineSeries, {
-      color: "#c084fc",
+      color: "#b794f6",
       lineWidth: 2,
-      title: "Upper quantile (90%)",
+      title: "Upper 90%",
+      lineStyle: 2,
       priceLineVisible: false,
+      lastValueVisible: false,
     });
 
     candleRef.current = candles;
     chartRef.current = chart;
     forecastRef.current = { median, lower, upper };
 
-    // Sample candles are placeholders until real history is loaded.
+    // Initial demo candles until historical data is available.
     const now = Math.floor(Date.now() / 1000);
     const initial = Array.from({ length: 20 }, (_, i) => {
       const close = 100 + Math.sin(i / 3);
@@ -86,32 +136,39 @@ export default function CandlestickChart({ marketUpdate }) {
 
     candles.setData(initial);
     lastCandleRef.current = initial[initial.length - 1];
+    setLastPrice(initial[initial.length - 1].close);
 
-    const resizeObserver = new ResizeObserver(() => {
-      chart.applyOptions({ width: container.clientWidth });
+    const observer = new ResizeObserver(() => {
+      chart.applyOptions({
+        width: container.clientWidth,
+      });
     });
 
-    resizeObserver.observe(container);
+    observer.observe(container);
 
     return () => {
-      resizeObserver.disconnect();
+      observer.disconnect();
       chart.remove();
+
       chartRef.current = null;
       candleRef.current = null;
       lastCandleRef.current = null;
       forecastRef.current = {};
+      fittedRef.current = false;
     };
   }, []);
 
+  // Live market updates
   useEffect(() => {
     if (!marketUpdate || !candleRef.current) return;
 
     const price = Number(marketUpdate.mid_price);
+
     if (!Number.isFinite(price)) return;
 
-    // Use minute candles to match the initial chart data.
-    const time = Math.floor(Date.now() / 60_000) * 60;
+    const time = Math.floor(Date.now() / 60000) * 60;
     const previous = lastCandleRef.current;
+
     if (!previous) return;
 
     let candle;
@@ -136,8 +193,10 @@ export default function CandlestickChart({ marketUpdate }) {
 
     candleRef.current.update(candle);
     lastCandleRef.current = candle;
+    setLastPrice(price);
   }, [marketUpdate]);
 
+  // TFT forecast
   useEffect(() => {
     let stopped = false;
 
@@ -150,6 +209,7 @@ export default function CandlestickChart({ marketUpdate }) {
         }
 
         const result = await response.json();
+
         if (stopped) return;
 
         const forecasts = result.forecasts ?? [];
@@ -177,13 +237,7 @@ export default function CandlestickChart({ marketUpdate }) {
 
         const { median, lower, upper } = forecastRef.current;
 
-        if (
-          !median ||
-          !lower ||
-          !upper
-        ) {
-          return;
-        }
+        if (!median || !lower || !upper) return;
 
         const medianPoints = points("median");
         const lowerPoints = points("lower");
@@ -201,9 +255,13 @@ export default function CandlestickChart({ marketUpdate }) {
         lower.setData(lowerPoints);
         upper.setData(upperPoints);
 
-        chartRef.current?.timeScale().fitContent();
+        // Fit the chart only on the first successful forecast.
+        if (!fittedRef.current) {
+          chartRef.current?.timeScale().fitContent();
+          fittedRef.current = true;
+        }
 
-        setStatus("TFT forecast loaded: 5 steps, 10th/50th/90th quantiles");
+        setStatus("TFT forecast successfully synchronized");
       } catch (error) {
         if (!stopped) {
           console.error("TFT forecast error:", error);
@@ -213,6 +271,7 @@ export default function CandlestickChart({ marketUpdate }) {
     }
 
     loadForecast();
+
     const timer = setInterval(loadForecast, 10000);
 
     return () => {
@@ -222,32 +281,59 @@ export default function CandlestickChart({ marketUpdate }) {
   }, []);
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 14,
-          marginBottom: 10,
-          fontSize: 12,
-        }}
-      >
-        <span style={{ color: "#60a5fa" }}>
-          ━ Median (50%)
-        </span>
-        <span style={{ color: "#f59e0b" }}>
-          ━ Lower bound (10%)
-        </span>
-        <span style={{ color: "#c084fc" }}>
-          ━ Upper bound (90%)
-        </span>
+    <div className="trading-chart">
+
+      <div className="chart-toolbar">
+
+        <div className="chart-price-info">
+          <span>MARKET PRICE</span>
+
+          <strong>
+            {lastPrice === null ? "—" : lastPrice.toFixed(2)}
+          </strong>
+        </div>
+
+        <div className="chart-status">
+          <span className="status-dot online" />
+          LIVE MARKET
+        </div>
+
       </div>
 
-      <div ref={containerRef} style={{ width: "100%" }} />
+      <div className="chart-legend">
 
-      <p style={{ color: "#94a3b8", fontSize: 12 }}>
-        {status}
-      </p>
+        <span>
+          <i className="legend-line median-line" />
+          Median (50%)
+        </span>
+
+        <span>
+          <i className="legend-line lower-line" />
+          Lower (10%)
+        </span>
+
+        <span>
+          <i className="legend-line upper-line" />
+          Upper (90%)
+        </span>
+
+        <span>
+          <i className="legend-candle" />
+          Market candles
+        </span>
+
+      </div>
+
+      <div
+        className="trading-chart-container"
+        ref={containerRef}
+      />
+
+      <div className="chart-footer">
+        <span>{status}</span>
+        <span>TEMPORAL FUSION TRANSFORMER</span>
+      </div>
+
     </div>
   );
 }
